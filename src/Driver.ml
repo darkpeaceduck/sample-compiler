@@ -14,7 +14,7 @@ let parse infile =
        ] s
      end
     )
-    (ostap (!(Language.Stmt.parse) -EOF))
+    (ostap (!(Language.Unit.parse) -EOF))
 
 let main = ()
   try
@@ -41,8 +41,9 @@ let main = ()
 	     let input = read [] in
 	     let output =
 	       match mode with
-	       | `SM -> StackMachine.Interpreter.run input (StackMachine.Compile.stmt stmt)
-	       | _   -> Interpreter.Stmt.eval input stmt
+	       | `SM -> 
+					StackMachine.Interpreter.run_unit input (StackMachine.Compile.unit stmt)
+	       | _   -> Interpreter.Stmt.eval_unit input stmt
 	     in
 	     List.iter (fun i -> Printf.printf "%d\n" i) output
 	)
