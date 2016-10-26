@@ -11,32 +11,46 @@ type i =
 
 module Interpreter =
   struct
-
     let run input code =
-      let rec run' (state, stack, input, output) code =
+			let rec map_labels l code' = 
+				match code' with
+				| [] -> l
+				| i::code'' ->
+					match i with 
+					| S_LABEL s -> map_labels ((s, code'')::l) code''
+				  | _ -> map_labels l code''
+			in 
+			let label_map = map_labels [] code in
+			let get_code_by_label s = (List.assoc s label_map) in
+      let rec run' ((state, stack, input, output) as c) code =
 		  	match code with
 					| []       -> output
 					| i::code' ->
-				    run' (match i with
+				    match i with
 	              | S_READ ->
 										  let y::input' = input in
-					  						(state, y::stack, input', output)
+					  						run' (state, y::stack, input', output) code'
 	              | S_WRITE ->
 										  let y::stack' = stack in
-					  						(state, stack', input, output @ [y])
+					  						run' (state, stack', input, output @ [y]) code'
 	              | S_PUSH n ->
-					 						(state, n::stack, input, output)
+					 						run' (state, n::stack, input, output) code'
 	              | S_LD x ->
-					 						 (state, (List.assoc x state)::stack, input, output)
+					 						run' (state, (List.assoc x state)::stack, input, output) code'
 	              | S_ST x ->
 				 							 let y::stack' = stack in
-										  ((x, y)::state, stack', input, output)
+										  run' ((x, y)::state, stack', input, output) code'
 	              | S_BINOP s ->
 											let b::a::stack' = stack in
 											let invoke_res = Interpreter.Expr.invoke_binop s a b in
-											(state, invoke_res::stack', input, output)
-	              )
-      		code'
+											run' (state, invoke_res::stack', input, output) code'
+								| S_JMP s ->
+											run' c (get_code_by_label s)
+								| S_LABEL s ->
+											run' c code'
+								| S_COND s ->
+											let a::stack' = stack in
+											if a == 0 then run' c (get_code_by_label s) else run' (state, stack', input, output) code'
  			in
       run' ([], [], input, []) code
   end
