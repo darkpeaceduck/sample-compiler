@@ -52,6 +52,9 @@ type instr =
 | X86Call of string
 | X86Set  of cmp_suf * opnd
 | X86And  of instr_suf * opnd * opnd
+| AsmLabel of string
+| X86Jmp of string
+| X86Jz  of string
 
 module S = Set.Make (String)
 
@@ -113,6 +116,9 @@ module Show =
 		| X86Cltd         -> "\tcltd"
 		| X86Set (suf, p)       -> Printf.sprintf "\tset%s\t%s" (cmp_suf suf) (opnd p)
 		| X86And (suf, s1, s2)  -> Printf.sprintf "\tand%s\t%s,\t%s" (instr_suf suf) (opnd s1) (opnd s2)
+		| AsmLabel s            -> Printf.sprintf "\t%s:" s
+		| X86Jmp s        ->  Printf.sprintf "\tjmp %s" s
+		| X86Jz s        ->  Printf.sprintf "\tjz %s" s
 
   end
 
@@ -202,6 +208,12 @@ module Compile =
    												 X86Mov (eax, x);
 													]
 										)
+
+							| S_LABEL s -> (stack, [AsmLabel s])
+							| S_JMP   s -> (stack, [X86Jmp s])
+							| S_COND  s -> 
+								let x::stack' = stack in 
+								(stack', [X86Mov (x, ebx); X86And (L, ebx, ebx); X86Jz s]) 
 										  
 	    in
 	    x86code @ compile stack' code'
