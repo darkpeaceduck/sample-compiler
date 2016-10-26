@@ -11,31 +11,31 @@ module Interpreter =
 
     let run input code =
       let rec run' (state, stack, input, output) code =
-	match code with
-	| []       -> output
-	| i::code' ->
-	    run'
-              (match i with
-              | S_READ ->
-		  let y::input' = input in
-		  (state, y::stack, input', output)
-              | S_WRITE ->
-		  let y::stack' = stack in
-		  (state, stack', input, output @ [y])
-              | S_PUSH n ->
-		  (state, n::stack, input, output)
-              | S_LD x ->
-		  (state, (List.assoc x state)::stack, input, output)
-              | S_ST x ->
-		  let y::stack' = stack in
-		  ((x, y)::state, stack', input, output)
-              | S_BINOP s ->
-		  failwith "stack machine: binop"
-              )
-              code'
-      in
+		  	match code with
+					| []       -> output
+					| i::code' ->
+				    run' (match i with
+	              | S_READ ->
+										  let y::input' = input in
+					  						(state, y::stack, input', output)
+	              | S_WRITE ->
+										  let y::stack' = stack in
+					  						(state, stack', input, output @ [y])
+	              | S_PUSH n ->
+					 						(state, n::stack, input, output)
+	              | S_LD x ->
+					 						 (state, (List.assoc x state)::stack, input, output)
+	              | S_ST x ->
+				 							 let y::stack' = stack in
+										  ((x, y)::state, stack', input, output)
+	              | S_BINOP s ->
+											let b::a::stack' = stack in
+											let invoke_res = Interpreter.Expr.invoke_binop s a b in
+											(state, invoke_res::stack', input, output)
+	              )
+      		code'
+ 			in
       run' ([], [], input, []) code
-	
   end
 
 module Compile =
@@ -47,7 +47,7 @@ module Compile =
     let rec expr = function
     | Var   x -> [S_LD   x]
     | Const n -> [S_PUSH n]
-    | Binop (s, x, y) -> failwith "stack machine compiler: binop"
+    | Binop (s, x, y) -> expr x @ expr y @ [S_BINOP s]
 
     let rec stmt = function
     | Skip          -> []

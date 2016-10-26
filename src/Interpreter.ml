@@ -21,6 +21,7 @@ module Expr =
 			| ">=" -> bool2int (a >= b)
 			| ">"  -> bool2int (a > b)
 			| "&&" -> bool2int (a <> 0  && b <> 0)
+			| "!!" -> bool2int (a <> 0  || b <> 0)
 		;;
 
     let rec eval state = function

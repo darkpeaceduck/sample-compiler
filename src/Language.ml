@@ -15,7 +15,7 @@ module Expr =
 
      ostap (
       parse:
-				l:eqs suf:(("&&") eqs)* {
+				l:eqs suf:(("&&" | "!!") eqs)* {
 					List.fold_left (fun l (op, r) -> Binop (Token.repr op, l, r)) l suf
 				}
 			| eqs;
