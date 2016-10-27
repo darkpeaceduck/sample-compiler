@@ -40,12 +40,12 @@ let main = ()
 	     in
 	     let input = read [] in
 	     let output =
-	(*
 	       match mode with
-	       | `SM -> StackMachine.Interpreter.run input (StackMachine.Compile.unit stmt)
-	       | _   -> Interpreter.Stmt.eval input stmt
-	*)
-				[]
+	       | `SM -> 
+					failwith "nope"
+					(*StackMachine.Interpreter.run input (StackMachine.Compile.unit stmt)
+					*)
+	       | _   -> Interpreter.Stmt.eval_unit input stmt
 	     in
 	     List.iter (fun i -> Printf.printf "%d\n" i) output
 	)
