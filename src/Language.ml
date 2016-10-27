@@ -54,7 +54,6 @@ module Stmt =
     | Seq    of t * t
     | If     of Expr.t * t * t
     | While  of Expr.t * t
-    | Repeat of t * Expr.t
     | Call   of string * Expr.t list
     | Return of Expr.t
 
