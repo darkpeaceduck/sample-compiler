@@ -279,20 +279,19 @@ module Compile =
 								(stack', [X86Mov (x, ebx); X86And (Long, ebx, ebx); X86Jz s]) 
 							| S_CALL (name, args_n) ->
 								let ret_value_place = env#allocate_local  in 
-								let tmp = env#allocate_local in
 								let rec unpack num_args left_stack = 
 									if (num_args == 0) then 
-											([], [X86Mov (eax, ret_value_place)])
+											([], [X86Mov (eax, ret_value_place)], left_stack)
 									else
 										match left_stack with
 										| x::stack' -> 
-											let (push_unp, pop_unp) = unpack (num_args - 1) stack' in
+											let (push_unp, pop_unp, st) = unpack (num_args - 1) stack' in
 											([X86Push x] @ push_unp, 
-											pop_unp @ [X86Pop tmp]) 
+											pop_unp @ [X86Pop eax], st) 
 										| [] -> failwith "stack is empty, but some more args exits"  
 								in 
-								let pre, post = unpack args_n stack in
-								(ret_value_place::stack, pre  @ [X86Call (env#func_name name)] @ post)
+								let pre, post, stack' = unpack args_n stack in
+								(ret_value_place::stack', pre  @ [X86Call (env#func_name name)] @ post)
 							| S_RET ->
 								let x::stack' = stack in
 								(stack', [X86Mov (x, eax); X86Jmp (env#epilogue_label name)])
