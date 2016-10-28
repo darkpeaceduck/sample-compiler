@@ -49,9 +49,9 @@ module Interpreter =
 						((y, x) :: state, stack'')
 				in
 				let call ((state, stack, input, output), code) args body = 
+					let (state', stack) = call_get_state stack args in
 					push_stack_ctx (state, stack, code);
-					let (state, stack) = call_get_state stack args in
-					run (state, stack, input, output) body
+					run (state', stack, input, output) body
 				in
 				let ret input output value = 
 					match  !stack_ctx_keeper with
@@ -87,7 +87,7 @@ module Interpreter =
 											run' c code'
 								| S_COND s ->
 											let a::stack' = stack in
-											if a == 0 then run' c (get_code_by_label s) else run' (state, stack', input, output) code'
+											if a == 0 then run' (state, stack', input, output) (get_code_by_label s) else run' (state, stack', input, output) code'
 								| S_CALL (name, n_args) ->
 											let (args, body) = get_call_ctx name in 
 											call (c, code') args body
