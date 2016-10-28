@@ -42,9 +42,7 @@ let main = ()
 	     let output =
 	       match mode with
 	       | `SM -> 
-					failwith "nope"
-					(*StackMachine.Interpreter.run input (StackMachine.Compile.unit stmt)
-					*)
+					StackMachine.Interpreter.run_unit input (StackMachine.Compile.unit stmt)
 	       | _   -> Interpreter.Stmt.eval_unit input stmt
 	     in
 	     List.iter (fun i -> Printf.printf "%d\n" i) output
