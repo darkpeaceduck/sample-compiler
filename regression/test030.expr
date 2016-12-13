@@ -21,7 +21,7 @@ begin
   rs := read ();
   cs := read ();
 
-  M := Arrmake (rs, {});
+  M := arrmake (rs, {});
 
   for i := 0, i < rs, i := i+1 do
     Mi := arrmake (cs, 0);
@@ -43,7 +43,7 @@ begin
 
   if rsA == csB && csA == rsB 
   then 
-    AB := Arrmake (rsA, {});
+    AB := arrmake (rsA, {});
     for i := 0, i < rsA, i := i+1 do
       ABi := arrmake (csB, 0);
       Ai  := A[i];

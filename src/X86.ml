@@ -196,7 +196,7 @@ struct
       | [] -> []
       | i:: code' ->
           let (stack', x86code) =
-            let call (name, args_n) =
+            let call (name, args_n) put_n = 
               let ret_value_place = env#allocate_local in
               let rec unpack num_args left_stack =
                 if (num_args == 0) then
@@ -210,18 +210,13 @@ struct
                   | [] -> failwith "stack is empty, but some more args exits"
               in
               let pre, post, stack' = unpack args_n stack in
-              (ret_value_place:: stack', pre @ [X86Call (name)] @ post)
+              let (put_n_args, pop_n_args) = 
+                if put_n then ([X86Push (L args_n)],[ X86Pop ebx]) 
+                else ([], [])
+              in
+              (ret_value_place:: stack', pre @ put_n_args @ [X86Call (name)] @ pop_n_args @ post)
             in
             match i with
-            | S_READ ->
-                let s = env#allocate_local in
-                (s:: stack, [X86Call "read"; X86Mov (eax, s)])
-            | S_WRITE ->
-                let x:: stack' = stack in ( stack', [
-                  X86Mov (x, eax);
-                  X86Push (eax);
-                  X86Call "write";
-                  X86Pop (eax)])
             | S_PUSH n' ->
               let res = match n' with
               | Int n -> (L n:: stack, [])
@@ -308,13 +303,21 @@ struct
                 let x:: stack' = stack in
                 (stack', [X86Mov (x, ebx); X86And (Long, ebx, ebx); X86Jz s])
             | S_CALL (name, args_n) ->
-                call (env#func_name name, args_n)
+                call (env#func_name name, args_n) false
             | S_BUILTIN (name, args_n) ->
-                call (env#builtin_func_name name, args_n)
+                call (env#builtin_func_name name, args_n) false
             | S_RET ->
                 let x:: stack' = stack in
                 (stack', [X86Mov (x, eax); X86Jmp (env#epilogue_label name)])
-          
+            | S_ELEM ind-> 
+                call (env#builtin_func_name "arrget", ind) true
+            | S_STA ind-> 
+                call (env#builtin_func_name "arrset", ind) true
+            | S_ARRAY (boxed, ind) ->
+              if boxed then
+                call (env#builtin_func_name "arrcreate_boxed", ind) true
+              else
+                call (env#builtin_func_name "arrcreate_unboxed", ind) true
           in
           x86code @ compile stack' code'
     in

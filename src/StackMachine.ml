@@ -13,6 +13,9 @@ type i =
   | S_CALL of string * int
   | S_BUILTIN of string * int
   | S_RET
+  | S_ARRAY of bool * int
+  | S_ELEM of int
+  | S_STA of int
 
 module MAP = Map.Make(String)
 
@@ -119,12 +122,20 @@ struct
   let label_counter = ref 0;;
   let label_generate () = label_counter:=!label_counter + 1; "label"^(string_of_int(!label_counter)) ;;
   
+  let unfold_list_expr exec args = 
+    List.fold_left (fun res arg -> res @ exec arg) [] args
+    
   let rec expr = function
     | Var x -> [S_LD x]
     | Const n -> [S_PUSH n]
     | Binop (s, x, y) -> expr x @ expr y @ [S_BINOP s]
     | Call (s, args) ->
-        List.fold_left (fun res arg -> res @ expr arg) [] args @ [S_CALL (s, (List.length args))]
+       unfold_list_expr expr args @ [S_CALL (s, (List.length args))]
+    | ArrayDef (boxed, args) -> 
+      unfold_list_expr expr args @ [S_ARRAY (boxed, List.length args)]
+      
+     | ArrayImp (ar, args) ->
+       expr ar @ unfold_list_expr expr args  @ [S_ELEM ((List.length args)+1)]
   
   let rec stmt = function
     | Skip -> []
@@ -145,6 +156,9 @@ struct
         expr e @ [S_RET]
     | Call (s, args) ->
         List.fold_left (fun res arg -> res @ expr arg) [] args @ [S_CALL (s, (List.length args))]
+        
+    | ArrayAssign (ar, args, e) ->
+        expr ar @  unfold_list_expr expr args @ expr e @ [S_STA ((List.length args) + 2)]
   
   let rec retrive_builtins defs = function
     | [] -> []
