@@ -8,9 +8,9 @@ module Expr =
 
     type t =
     | Const of int
-    | Var   of string
+    | Var of string
     | Binop of string * t * t
-    | Call  of string * t list
+    | Call of string * t list
 
     let rec is_zero x = 
       Binop ("==", x, Const 0) 
@@ -20,9 +20,9 @@ module Expr =
 	  !(Ostap.Util.expr 
              (fun x -> x)
 	     (Array.map (fun (a, s) -> a, 
-                         List.map  (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s
+                         List.map (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s
                         ) 
-              [|                
+              [| 
 		`Lefta, ["!!"];
 		`Lefta, ["&&"];
 		`Nona , ["=="; "!="; "<="; "<"; ">="; ">"];
@@ -32,12 +32,12 @@ module Expr =
 	     )
 	     primary);
       primary:
-        n:DECIMAL {Const n}
-      | f:IDENT args:(-"(" !(Util.list0 parse) -")")? {
+        n: DECIMAL { Const n }
+      | f: IDENT args: (-"(" !(Util.list0 parse) -")")? {
 	  match args with 
-	  | None      -> Var f 
+	  | None -> Var f 
 	  | Some args -> Call (f, args)
-        }      
+        } 
       | -"(" parse -")"
     )
 
@@ -49,30 +49,30 @@ module Stmt =
     type t =
     | Skip
     | Assign of string * Expr.t
-    | Read   of string
-    | Write  of Expr.t
-    | Seq    of t * t
-    | If     of Expr.t * t * t
-    | While  of Expr.t * t
-    | Call   of string * Expr.t list
+    | Read of string
+    | Write of Expr.t
+    | Seq of t * t
+    | If of Expr.t * t * t
+    | While of Expr.t * t
+    | Call of string * Expr.t list
     | Return of Expr.t
 
     ostap (
-      parse: s:simple d:(-";" parse)? {match d with None -> s | Some d -> Seq (s, d)};
+      parse: s: simple d: (-";" parse)? { match d with None -> s | Some d -> Seq (s, d) };
       expr : !(Expr.parse);
       simple:
-        x:IDENT s:(":=" e:expr {Assign (x, e)} | 
-                   "(" args:!(Util.list0 expr) ")" {Call (x, args)}
-                  ) {s}
+        x: IDENT s: (":=" e: expr { Assign (x, e) } | 
+                   "(" args:!(Util.list0 expr) ")" { Call (x, args) }
+                  ) { s }
       (*| %"read"  "(" x:IDENT ")" {Read x}
-      | %"write" "(" e:expr  ")" {Write e}
+      | %"write" "(" e: expr ")" { Write e }
       *)
-      | %"skip"                  {Skip}
-      | %"return" e:expr         {Return e} 
-      | %"if" e:expr 
-	  %"then" the:parse 
-          elif:(%"elif" expr %"then" parse)*
-	  els:(%"else" parse)? 
+      | %"skip" { Skip }
+      | %"return" e: expr { Return e } 
+      | %"if" e: expr 
+	  %"then" the: parse 
+          elif: (%"elif" expr %"then" parse) *
+	  els: (%"else" parse)? 
         %"fi" {
           If (e, the, 
 	         List.fold_right 
@@ -81,9 +81,9 @@ module Stmt =
 		   (match els with None -> Skip | Some s -> s)
           )
         }
-      | %"while"  e:expr %"do"  body:parse %"od" {While (e, body)}
-      | %"repeat" e:parse "until" cond:!(Expr.parse) { Seq (e, While((Expr.is_zero cond), e))}
-      | %"for" i:parse "," c:expr "," s:parse %"do" b:parse %"od" {
+      | %"while" e: expr %"do" body: parse %"od" { While (e, body) }
+      | %"repeat" e: parse "until" cond:!(Expr.parse) { Seq (e, While((Expr.is_zero cond), e)) }
+      | %"for" i: parse "," c: expr "," s: parse %"do" b: parse %"od" {
 	  Seq (i, While (c, Seq (b, s)))
         }
     )
@@ -96,8 +96,8 @@ module Def =
     type t = string * (string list * Stmt.t)
 
     ostap (
-      arg  : IDENT;
-      parse: %"fun" name:IDENT "(" args:!(Util.list0 arg) ")" %"begin" body:!(Stmt.parse) %"end" {
+      arg : IDENT;
+      parse: %"fun" name: IDENT "(" args:!(Util.list0 arg) ")" %"begin" body:!(Stmt.parse) %"end" {
         (name, (args, body))
       }
     )
@@ -110,7 +110,7 @@ module Unit =
     type t = Def.t list * Stmt.t
 
     ostap (
-      parse: !(Def.parse)* !(Stmt.parse)
+      parse: !(Def.parse) * !(Stmt.parse)
     )
 
   end
