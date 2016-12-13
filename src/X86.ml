@@ -1,4 +1,6 @@
-type opnd = R of int | R8 of int | S of int | Farg of int | M of string | L of int
+open Language.Value
+
+type opnd = R of int | R8 of int | S of int | Farg of int | M of string | L of int | SC of string
 
 let x86regs = [|
   "%eax";
@@ -117,7 +119,17 @@ object(self)
   
   method func_name name = "func"^name
   
+  method builtin_func_name name = "bt_"^name
+  
   method main_name = "main"
+  
+  val str_consts = ref []
+  method get_str_form index= "str_"^string_of_int(index)
+  method get_str_addr : string -> opnd =
+    fun s ->
+    str_consts := !str_consts @ [s];
+    SC (self#get_str_form(List.length (!str_consts) - 1))
+  method get_str_consts = !str_consts
   
 end
 
@@ -131,6 +143,7 @@ struct
     | Farg i -> Printf.sprintf "%d(%%ebp)" ((i +1) * word_size)
     | M x -> x
     | L i -> Printf.sprintf "$%d" i
+    | SC i -> Printf.sprintf "$%s" i
   
   let cmp_suf = function
     | Eq -> "e"
@@ -209,8 +222,12 @@ struct
                   X86Push (eax);
                   X86Call "write";
                   X86Pop (eax)])
-            | S_PUSH n ->
-                (L n:: stack, [])
+            | S_PUSH n' ->
+              let res = match n' with
+              | Int n -> (L n:: stack, [])
+              | a -> (env#get_str_addr (to_string a) :: stack, [])
+              in
+              res
             | S_LD x ->
                 let sn = match (env#get_opnd x) with
                   | Some (sn) -> sn
@@ -293,7 +310,7 @@ struct
             | S_CALL (name, args_n) ->
                 call (env#func_name name, args_n)
             | S_BUILTIN (name, args_n) ->
-                call (name, args_n)
+                call (env#builtin_func_name name, args_n)
             | S_RET ->
                 let x:: stack' = stack in
                 (stack', [X86Mov (x, eax); X86Jmp (env#epilogue_label name)])
@@ -329,11 +346,17 @@ let compile unit =
   let asm = Buffer.create 1024 in
   let (!!) s = Buffer.add_string asm s in
   let (!) s = !!s; !!"\n" in
+  
+  !"\t.data";
+  List.iteri (fun i x-> 
+    !(Printf.sprintf "\t%s:\t.asciz\"%s\"" (env#get_str_form i) x)) 
+    env#get_str_consts;
   !"\t.text";
   !"\t.globl\tmain";
   List.iter (fun x ->
           !(Printf.sprintf "\t.comm\t%s,\t%d,\t%d" x word_size word_size))
-    env#global_vars;
+  env#global_vars;
+  
   
   let show_func fun_code = List.iter (fun i -> !(Show.instr i)) fun_code in
   List.iter (fun fun_code -> show_func fun_code) funs_code;

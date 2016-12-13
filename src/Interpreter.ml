@@ -2,26 +2,38 @@ module Expr =
 struct
   
   open Language.Expr
+  open Language.Value
   
   let bool2int arg =
     if arg then 1 else 0
   ;;
   
-  let invoke_binop str a b =
-    match str with
-    | "+" -> a + b
-    | "-" -> a - b
-    | "*" -> a * b
-    | "/" -> a / b
-    | "%" -> a mod b
-    | "<=" -> bool2int (a <= b)
-    | "<" -> bool2int (a < b)
-    | "==" -> bool2int (a == b)
-    | "!=" -> bool2int (a != b)
-    | ">=" -> bool2int (a >= b)
-    | ">" -> bool2int (a > b)
-    | "&&" -> bool2int (a <> 0 && b <> 0)
-    | "!!" -> bool2int (a <> 0 || b <> 0)
+  let invoke_binop str a' b' =
+    let check = function
+      | Int k -> k
+      | String b -> failwith "binop on strings"
+    in
+    let a = check a'
+    in
+    let b = check b'
+    in
+    let result =
+      match str with
+      | "+" -> a + b
+      | "-" -> a - b
+      | "*" -> a * b
+      | "/" -> a / b
+      | "%" -> a mod b
+      | "<=" -> bool2int (a <= b)
+      | "<" -> bool2int (a < b)
+      | "==" -> bool2int (a == b)
+      | "!=" -> bool2int (a != b)
+      | ">=" -> bool2int (a >= b)
+      | ">" -> bool2int (a > b)
+      | "&&" -> bool2int (a <> 0 && b <> 0)
+      | "!!" -> bool2int (a <> 0 || b <> 0)
+    in
+    Int result
   ;;
   
   let rec eval ((state, input, output) as c) call_f = function
@@ -44,6 +56,7 @@ module Stmt =
 struct
   
   open Language.Stmt
+  open Language.Value
   
   let call_ctx_keeper = ref MAP.empty;;
   let add_call_ctx name args body = call_ctx_keeper := MAP.add name (args, body) !call_ctx_keeper;;
@@ -90,15 +103,15 @@ struct
         | If (cond, e1, e2) ->
             let (e_inp, e_out, rc) = eval_expr c cond in
             let selected_expr =
-              if rc <> 0 then e1 else e2
+              if to_bool(rc) then e1 else e2
             in
             eval' (state, e_inp, e_out, ret) selected_expr
         | While (cond, e) ->
             let ref_context = ref c in
             while ((check_returned !ref_context) == false &&
-              (let (e_inp, e_outp, rc) = eval_expr !ref_context cond in
+              to_bool(let (e_inp, e_outp, rc) = eval_expr !ref_context cond in
                 ref_context := ((retrieve_state !ref_context), e_inp, e_outp, ret);
-                rc ) <> 0) do
+                rc )) do
               ref_context := eval' (!ref_context) e;
             done;
             !ref_context
@@ -109,7 +122,7 @@ struct
             let (e_inp, e_out, rc) = eval_expr c e in
             (state, e_inp, e_out, (rc, true))
     in
-    let (_, input, output, ret) = eval' (state, input, output, (0, false)) stmt in
+    let (_, input, output, ret) = eval' (state, input, output, (Int 0, false)) stmt in
     (input, output, ret)
   
   let eval_unit input (defs, main_body) =

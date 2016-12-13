@@ -1,7 +1,9 @@
+open Language
+
 type i =
   | S_READ
   | S_WRITE
-  | S_PUSH of int
+  | S_PUSH of Language.Value.t
   | S_LD of string
   | S_ST of string
   | S_BINOP of string
@@ -88,7 +90,9 @@ struct
               run' c code'
           | S_COND s ->
               let a:: stack' = stack in
-              if a == 0 then run' (state, stack', input, output) (get_code_by_label s) else run' (state, stack', input, output) code'
+              if Value.to_bool(a) == false then 
+                run' (state, stack', input, output) (get_code_by_label s) 
+              else run' (state, stack', input, output) code'
           | S_CALL (name, n_args) ->
               let (args, body) = get_call_ctx name in
               call (c, code') args body

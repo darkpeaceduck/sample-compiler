@@ -1,27 +1,51 @@
 open Ostap
 open Matcher
 
+
+module Value =
+  struct
+     type t = Int of int | String of bytes
+     
+     let to_bool : t -> bool = function
+      | Int a -> a <> 0
+      | String b -> (Bytes.length b) > 0
+     let to_string : t -> string = function
+      | Int a -> string_of_int a
+      | String b -> Bytes.to_string(b)  
+      ostap (
+        parse:
+        s:STRING   { String (String.sub s 1 (String.length s - 2)) }
+        | c:CHAR { Int (Char.code c)} 
+        | x : DECIMAL { Int x}
+        | "true"  { Int 1}
+        | "false" { Int 0}
+      )
+  end
+  
+  
 module Expr =
   struct
-    
-
-
     type t =
-    | Const of int
+    | Const of Value.t
     | Var of string
     | Binop of string * t * t
     | Call of string * t list
 
     let rec is_zero x = 
-      Binop ("==", x, Const 0) 
+      Binop ("==", x, Const (Int 0)) 
     ;;
     ostap (
       parse:
 	  !(Ostap.Util.expr 
-             (fun x -> x)
-	     (Array.map (fun (a, s) -> a, 
+             
+            (fun x -> x)
+	     
+      
+      (Array.map 
+      
+      (fun (a, s) -> a, 
                          List.map (fun s -> ostap(- $(s)), (fun x y -> Binop (s, x, y))) s
-                        ) 
+       ) 
               [| 
 		`Lefta, ["!!"];
 		`Lefta, ["&&"];
@@ -32,7 +56,7 @@ module Expr =
 	     )
 	     primary);
       primary:
-        n: DECIMAL { Const n }
+        n:!(Value.parse) { Const n }
       | f: IDENT args: (-"(" !(Util.list0 parse) -")")? {
 	  match args with 
 	  | None -> Var f 
