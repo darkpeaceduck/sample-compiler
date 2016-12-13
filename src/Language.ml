@@ -64,8 +64,9 @@ module Stmt =
         x:IDENT s:(":=" e:expr {Assign (x, e)} | 
                    "(" args:!(Util.list0 expr) ")" {Call (x, args)}
                   ) {s}
-      | %"read"  "(" x:IDENT ")" {Read x}
+      (*| %"read"  "(" x:IDENT ")" {Read x}
       | %"write" "(" e:expr  ")" {Write e}
+      *)
       | %"skip"                  {Skip}
       | %"return" e:expr         {Return e} 
       | %"if" e:expr 
@@ -96,7 +97,7 @@ module Def =
 
     ostap (
       arg  : IDENT;
-      parse: name:IDENT "(" args:!(Util.list0 arg) ")" %"begin" body:!(Stmt.parse) %"end" {
+      parse: %"fun" name:IDENT "(" args:!(Util.list0 arg) ")" %"begin" body:!(Stmt.parse) %"end" {
         (name, (args, body))
       }
     )

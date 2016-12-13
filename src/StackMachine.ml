@@ -9,6 +9,7 @@ type i =
 | S_JMP   of string
 | S_LABEL of string
 | S_CALL  of string * int
+| S_BUILTIN of string * int
 | S_RET
 
 module MAP = Map.Make(String)
@@ -146,11 +147,30 @@ module Compile =
 			List.fold_left (fun res arg -> res @ expr arg) [] args @   [S_CALL (s, (List.length args))]
 			
 		
+    let rec retrive_builtins defs = function
+       | [] -> []
+       | x:: xs -> 
+        let replac = 
+          match x with
+           | S_CALL(s, args) -> 
+            if List.exists (fun (a, _) -> String.equal s a) defs then
+              S_CALL(s, args)
+            else
+              S_BUILTIN(s, args)
+           | e -> e
+        in 
+        [replac] @ retrive_builtins defs xs
+    ;;
+          
 		let rec def = function
 			| (name, (args, body)) -> (name, (args, stmt body))
 
+  
 		let rec unit (defs, main_body) = 
 			let defs_compile = List.fold_left (fun res d -> [def d] @ res) [] defs in
-			(defs_compile, stmt main_body)
+      let defs_with_builtins = List.map (fun (name, (args, body)) -> 
+        let new_body =  retrive_builtins  defs_compile body in
+        (name, (args, new_body))) defs_compile in
+			(defs_with_builtins, retrive_builtins defs_compile (stmt main_body))
 		;;
   end

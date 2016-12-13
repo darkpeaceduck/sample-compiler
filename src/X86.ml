@@ -25,9 +25,9 @@ let edx = R 3
 let esi = R 4
 let edi = R 5
 
-let al  = R8 0
-let ah  = R8 1
-let bl  = R8 2
+let al = R8 0
+let ah = R8 1
+let bl = R8 2
 
 type cmp_suf = 
 	| Eq | Neq | Less | Leq | G | Geq | Nz
@@ -38,24 +38,24 @@ type instr_suf =
 type special_suf = Prologue of int | Epilogue
 
 type instr =
-| X86Add  of opnd * opnd
-| X86Sub  of opnd * opnd
-| X86Mul  of opnd * opnd
-| X86Xor  of opnd * opnd
-| X86Or   of opnd * opnd
-| X86Div  of opnd
-| X86Cmp  of opnd * opnd
+| X86Add of opnd * opnd
+| X86Sub of opnd * opnd
+| X86Mul of opnd * opnd
+| X86Xor of opnd * opnd
+| X86Or of opnd * opnd
+| X86Div of opnd
+| X86Cmp of opnd * opnd
 | X86Cltd
-| X86Mov  of opnd * opnd
+| X86Mov of opnd * opnd
 | X86Push of opnd
-| X86Pop  of opnd
+| X86Pop of opnd
 | X86Ret
 | X86Call of string
-| X86Set  of cmp_suf * opnd
-| X86And  of instr_suf * opnd * opnd
+| X86Set of cmp_suf * opnd
+| X86And of instr_suf * opnd * opnd
 | AsmLabel of string
 | X86Jmp of string
-| X86Jz  of string
+| X86Jz of string
 | Special of special_suf
 
 type scope = GLOB | FUN
@@ -67,12 +67,12 @@ class x86env =
   object(self)
 	
 		val val_scope = ref GLOB; 
-		method set_scope scope_t = val_scope := scope_t 	
+		method set_scope scope_t = val_scope := scope_t 
 		method get_scope = !val_scope
 	   
-    val    local_vars = ref MAP.empty
-		val    allocated_local  = ref 0;
-    method assign_local x opnd  = local_vars := MAP.add x opnd !local_vars ;
+    val local_vars = ref MAP.empty
+		val allocated_local = ref 0;
+    method assign_local x opnd = local_vars := MAP.add x opnd !local_vars ;
     method get_local x = 
 			try 
 				Some (MAP.find x !local_vars) 
@@ -87,12 +87,12 @@ class x86env =
 						self#assign_local x result; 
 						result
 					
-		method allocated_local  =  !allocated_local
+		method allocated_local = !allocated_local
 		method release_locals = 
 			local_vars := MAP.empty;
 			allocated_local := 0
 		
-		val    global_vars = ref SET.empty
+		val global_vars = ref SET.empty
 		method allocate_global x = 
 			global_vars := SET.add x !global_vars;
 			M x
@@ -102,7 +102,7 @@ class x86env =
 		
 
     method allocate x = 
-			if self#get_scope ==  FUN then
+			if self#get_scope == FUN then
 					self#create_local x
 			else
 					self#allocate_global x
@@ -117,7 +117,7 @@ class x86env =
 		
 		method epilogue_label func_name = func_name^"_epilogue" 
 		
-		method func_name name = "func_"^name
+		method func_name name = "func"^name
 		
 		method main_name = "main"
 			
@@ -130,7 +130,7 @@ module Show =
     | R i -> x86regs.(i)
 		| R8 i -> x86regs8.(i)
     | S i -> Printf.sprintf "-%d(%%ebp)" (i * word_size)
-		| Farg i -> Printf.sprintf "%d(%%ebp)" ((i+1) * word_size)
+		| Farg i -> Printf.sprintf "%d(%%ebp)" ((i +1) * word_size)
     | M x -> x
     | L i -> Printf.sprintf "$%d" i
 
@@ -141,36 +141,36 @@ module Show =
 			| Leq -> "le"
 			| G -> "g"
 			| Geq -> "ge"
-			| Nz  -> "nz"
+			| Nz -> "nz"
 
 		let instr_suf = function
 			| Long -> "l"
 			| None -> ""
 
 		let special = function
-			| Prologue allocated  -> Printf.sprintf "\tpushl\t%%ebp\n\tmovl\t%%esp,\t%%ebp\n\tsubl\t$%d,\t%%esp" (allocated * word_size)
+			| Prologue allocated -> Printf.sprintf "\tpushl\t%%ebp\n\tmovl\t%%esp,\t%%ebp\n\tsubl\t$%d,\t%%esp" (allocated * word_size)
 			| Epilogue -> "\tmovl\t%ebp,\t%esp\n\tpopl\t%ebp"
 
     let instr = function
-    | X86Add (s1, s2) -> Printf.sprintf "\taddl\t%s,\t%s"  (opnd s1) (opnd s2)
-		| X86Sub (s1, s2) -> Printf.sprintf "\tsubl\t%s,\t%s"  (opnd s1) (opnd s2)
-		| X86Cmp (s1, s2) -> Printf.sprintf "\tcmp\t%s,\t%s"   (opnd s1) (opnd s2)
-		| X86Xor (s1, s2) -> Printf.sprintf "\txorl\t%s,\t%s"    (opnd s1) (opnd s2)
-		| X86Or (s1, s2) -> Printf.sprintf "\torl\t%s,\t%s"    (opnd s1) (opnd s2)
+    | X86Add (s1, s2) -> Printf.sprintf "\taddl\t%s,\t%s" (opnd s1) (opnd s2)
+		| X86Sub (s1, s2) -> Printf.sprintf "\tsubl\t%s,\t%s" (opnd s1) (opnd s2)
+		| X86Cmp (s1, s2) -> Printf.sprintf "\tcmp\t%s,\t%s" (opnd s1) (opnd s2)
+		| X86Xor (s1, s2) -> Printf.sprintf "\txorl\t%s,\t%s" (opnd s1) (opnd s2)
+		| X86Or (s1, s2) -> Printf.sprintf "\torl\t%s,\t%s" (opnd s1) (opnd s2)
     | X86Mul (s1, s2) -> Printf.sprintf "\timull\t%s,\t%s" (opnd s1) (opnd s2)
-		| X86Div s        -> Printf.sprintf "\tidivl\t%s"       (opnd s) 
-    | X86Mov (s1, s2) -> Printf.sprintf "\tmovl\t%s,\t%s"  (opnd s1) (opnd s2)
-    | X86Push s       -> Printf.sprintf "\tpushl\t%s"      (opnd s )
-    | X86Pop  s       -> Printf.sprintf "\tpopl\t%s"       (opnd s )
-    | X86Ret          -> "\tret"
-    | X86Call p       -> Printf.sprintf "\tcall\t%s" p
-		| X86Cltd         -> "\tcltd"
-		| X86Set (suf, p)       -> Printf.sprintf "\tset%s\t%s" (cmp_suf suf) (opnd p)
-		| X86And (suf, s1, s2)  -> Printf.sprintf "\tand%s\t%s,\t%s" (instr_suf suf) (opnd s1) (opnd s2)
-		| AsmLabel s            -> Printf.sprintf "\t%s:" s
-		| X86Jmp s        ->  Printf.sprintf "\tjmp %s" s
-		| X86Jz s        ->  Printf.sprintf "\tjz %s" s
-		| Special arg  ->    special arg
+		| X86Div s -> Printf.sprintf "\tidivl\t%s" (opnd s) 
+    | X86Mov (s1, s2) -> Printf.sprintf "\tmovl\t%s,\t%s" (opnd s1) (opnd s2)
+    | X86Push s -> Printf.sprintf "\tpushl\t%s" (opnd s )
+    | X86Pop s -> Printf.sprintf "\tpopl\t%s" (opnd s )
+    | X86Ret -> "\tret"
+    | X86Call p -> Printf.sprintf "\tcall\t%s" p
+		| X86Cltd -> "\tcltd"
+		| X86Set (suf, p) -> Printf.sprintf "\tset%s\t%s" (cmp_suf suf) (opnd p)
+		| X86And (suf, s1, s2) -> Printf.sprintf "\tand%s\t%s,\t%s" (instr_suf suf) (opnd s1) (opnd s2)
+		| AsmLabel s -> Printf.sprintf "\t%s:" s
+		| X86Jmp s -> Printf.sprintf "\tjmp %s" s
+		| X86Jz s -> Printf.sprintf "\tjz %s" s
+		| Special arg -> special arg
 			
   end
 
@@ -183,38 +183,54 @@ module Compile =
     let stack_program env name code =
       let rec compile stack code =
 	match code with
-	| []       -> []
-	| i::code' ->
+	| [] -> []
+	| i:: code' ->
 	    let (stack', x86code) =
+        let call (name, args_n) = 
+          let ret_value_place = env#allocate_local in 
+								let rec unpack num_args left_stack = 
+									if (num_args == 0) then 
+											([], [X86Mov (eax, ret_value_place)], left_stack)
+									else
+										match left_stack with
+										| x:: stack' -> 
+											let (push_unp, pop_unp, st) = unpack (num_args - 1) stack' in
+											([X86Push x] @ push_unp, 
+											pop_unp @ [X86Pop eax], st) 
+										| [] -> failwith "stack is empty, but some more args exits" 
+								in 
+								let pre, post, stack' = unpack args_n stack in
+								(ret_value_place:: stack', pre @ [X86Call (name)] @ post)
+              in
               match i with
-              | S_READ   -> 
+              | S_READ -> 
 								let s = env#allocate_local in 
-								(s::stack, [X86Call "read"; X86Mov (eax, s)])
-              | S_WRITE  -> 
-								let x::stack' = stack in ( stack', [
+								(s:: stack, [X86Call "read"; X86Mov (eax, s)])
+              | S_WRITE -> 
+								let x:: stack' = stack in ( stack', [
 														X86Mov (x, eax);
 														X86Push (eax); 
 														X86Call "write"; 
 														X86Pop (eax)])
               | S_PUSH n ->
-								  (L n::stack, [])
-              | S_LD x   ->
+								  (L n:: stack, [])
+              | S_LD x ->
 								  let sn = match (env#get_opnd x) with
 											| Some (sn) -> sn
-											| None ->  failwith (Printf.sprintf "local varible %s doen's exists" x)
+											| None -> failwith (Printf.sprintf "local varible %s doen's exists" x)
 									in 
-								  (sn::stack, [])
-              | S_ST x   ->
-									let s::stack' = stack in 
+								  (sn:: stack, [])
+              | S_ST x ->
+									let s:: stack' = stack in 
 								  let sn = match env#get_opnd x with
 											| None -> env#allocate x
 											| Some sn' -> sn'
 									in
 								  (stack', [X86Mov (s, eax); X86Mov (eax, sn)])
 				      | S_BINOP s ->
-								let y::x::stack' = stack in
+								let y:: x:: stack' = stack in
 										let res = env#allocate_local in
-										(res::stack',  
+										(res:: stack', 
 											let (div_op, div_end, mod_end) = (
 												[X86Mov (x, eax); X86Mov (y, ebx); X86Cltd; X86Div ebx], 
 											[X86Mov (eax, res)], [X86Mov (edx, res)]) in
@@ -273,27 +289,16 @@ module Compile =
 										)
 
 							| S_LABEL s -> (stack, [AsmLabel s])
-							| S_JMP   s -> (stack, [X86Jmp s])
-							| S_COND  s -> 
-								let x::stack' = stack in 
+							| S_JMP s -> (stack, [X86Jmp s])
+							| S_COND s -> 
+								let x:: stack' = stack in 
 								(stack', [X86Mov (x, ebx); X86And (Long, ebx, ebx); X86Jz s]) 
 							| S_CALL (name, args_n) ->
-								let ret_value_place = env#allocate_local  in 
-								let rec unpack num_args left_stack = 
-									if (num_args == 0) then 
-											([], [X86Mov (eax, ret_value_place)], left_stack)
-									else
-										match left_stack with
-										| x::stack' -> 
-											let (push_unp, pop_unp, st) = unpack (num_args - 1) stack' in
-											([X86Push x] @ push_unp, 
-											pop_unp @ [X86Pop eax], st) 
-										| [] -> failwith "stack is empty, but some more args exits"  
-								in 
-								let pre, post, stack' = unpack args_n stack in
-								(ret_value_place::stack', pre  @ [X86Call (env#func_name name)] @ post)
+                call (env#func_name name, args_n)
+              | S_BUILTIN (name, args_n) ->
+								call (name, args_n)
 							| S_RET ->
-								let x::stack' = stack in
+								let x:: stack' = stack in
 								(stack', [X86Mov (x, eax); X86Jmp (env#epilogue_label name)])
 								
 								
@@ -326,16 +331,16 @@ let compile unit =
   let (defs, main_body) = StackMachine.Compile.unit unit in
 	let main_code = compile_main env main_body in 
 	let funs_code = List.map (fun (name, (args, body)) -> compile_function env name args body) defs in
-  let asm  = Buffer.create 1024 in
+  let asm = Buffer.create 1024 in
   let (!!) s = Buffer.add_string asm s in
-  let (!)  s = !!s; !!"\n" in
+  let (!) s = !!s; !!"\n" in
   !"\t.text";
   !"\t.globl\tmain";
   List.iter (fun x ->
-      !(Printf.sprintf "\t.comm\t%s,\t%d,\t%d" x word_size word_size)) 	
+      !(Printf.sprintf "\t.comm\t%s,\t%d,\t%d" x word_size word_size)) 
 			env#global_vars;
 			
-	let show_func fun_code =  List.iter (fun i -> !(Show.instr i)) fun_code in
+	let show_func fun_code = List.iter (fun i -> !(Show.instr i)) fun_code in
 	List.iter (fun fun_code -> show_func fun_code) funs_code; 
 	show_func main_code;
 	!!"\n";
