@@ -124,11 +124,11 @@ object(self)
   method main_name = "main"
   
   val str_consts = ref []
-  method get_str_form index= "str_"^string_of_int(index)
+  method get_str_form index = "str_"^string_of_int(index)
   method get_str_addr : string -> opnd =
     fun s ->
-    str_consts := !str_consts @ [s];
-    SC (self#get_str_form(List.length (!str_consts) - 1))
+        str_consts := !str_consts @ [s];
+        SC (self#get_str_form(List.length (!str_consts) - 1))
   method get_str_consts = !str_consts
   
 end
@@ -196,7 +196,7 @@ struct
       | [] -> []
       | i:: code' ->
           let (stack', x86code) =
-            let call (name, args_n) put_n = 
+            let call (name, args_n) put_n =
               let ret_value_place = env#allocate_local in
               let rec unpack num_args left_stack =
                 if (num_args == 0) then
@@ -210,19 +210,19 @@ struct
                   | [] -> failwith "stack is empty, but some more args exits"
               in
               let pre, post, stack' = unpack args_n stack in
-              let (put_n_args, pop_n_args) = 
-                if put_n then ([X86Push (L args_n)],[ X86Pop ebx]) 
+              let (put_n_args, pop_n_args) =
+                if put_n then ([X86Push (L args_n)],[ X86Pop ebx])
                 else ([], [])
               in
               (ret_value_place:: stack', pre @ put_n_args @ [X86Call (name)] @ pop_n_args @ post)
             in
             match i with
             | S_PUSH n' ->
-              let res = match n' with
-              | Int n -> (L n:: stack, [])
-              | a -> (env#get_str_addr (to_string a) :: stack, [])
-              in
-              res
+                let res = match n' with
+                  | Int n -> (L n:: stack, [])
+                  | a -> (env#get_str_addr (to_string a) :: stack, [])
+                in
+                res
             | S_LD x ->
                 let sn = match (env#get_opnd x) with
                   | Some (sn) -> sn
@@ -309,15 +309,15 @@ struct
             | S_RET ->
                 let x:: stack' = stack in
                 (stack', [X86Mov (x, eax); X86Jmp (env#epilogue_label name)])
-            | S_ELEM ind-> 
+            | S_ELEM ind ->
                 call (env#builtin_func_name "arrget", ind) true
-            | S_STA ind-> 
+            | S_STA ind ->
                 call (env#builtin_func_name "arrset", ind) true
             | S_ARRAY (boxed, ind) ->
-              if boxed then
-                call (env#builtin_func_name "arrcreate_boxed", ind) true
-              else
-                call (env#builtin_func_name "arrcreate_unboxed", ind) true
+                if boxed then
+                  call (env#builtin_func_name "arrcreate_boxed", ind) true
+                else
+                  call (env#builtin_func_name "arrcreate_unboxed", ind) true
           in
           x86code @ compile stack' code'
     in
@@ -351,15 +351,14 @@ let compile unit =
   let (!) s = !!s; !!"\n" in
   
   !"\t.data";
-  List.iteri (fun i x-> 
-    !(Printf.sprintf "\t%s:\t.asciz\"%s\"" (env#get_str_form i) x)) 
+  List.iteri (fun i x ->
+          !(Printf.sprintf "\t%s:\t.asciz\"%s\"" (env#get_str_form i) x))
     env#get_str_consts;
   !"\t.text";
   !"\t.globl\tmain";
   List.iter (fun x ->
           !(Printf.sprintf "\t.comm\t%s,\t%d,\t%d" x word_size word_size))
-  env#global_vars;
-  
+    env#global_vars;
   
   let show_func fun_code = List.iter (fun i -> !(Show.instr i)) fun_code in
   List.iter (fun fun_code -> show_func fun_code) funs_code;

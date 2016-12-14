@@ -4,21 +4,18 @@ open Matcher
 
 module Value =
   struct
-     type t = Int of int |  String of bytes
+     type t = Int of int | String of bytes
      
-     let to_bool : t -> bool = function
-      | Int a -> a <> 0
-      | String b -> (Bytes.length b) > 0
      let to_string : t -> string = function
       | Int a -> string_of_int a
-      | String b -> Bytes.to_string(b)  
+      | String b -> Bytes.to_string(b) 
       ostap (
         parse:
-        s:STRING   { String (String.sub s 1 (String.length s - 2)) }
-        | c:CHAR { Int (Char.code c)} 
-        | x : DECIMAL { Int x}
-        | "true"  { Int 1}
-        | "false" { Int 0}
+        s: STRING { String (String.sub s 1 (String.length s - 2)) }
+        | c: CHAR { Int (Char.code c) } 
+        | x : DECIMAL { Int x }
+        | "true" { Int 1 }
+        | "false" { Int 0 }
       )
   end
   
@@ -30,8 +27,8 @@ module Expr =
     | Var of string
     | Binop of string * t * t
     | Call of string * t list
-    (* because of expr like "a:=[f(0), f(1)]" and b:=f()[] supports - array boxing checks only
-      with interpretation*)
+(* because of expr like "a:=[f(0), f(1)]" and b:=f()[] supports - array    *)
+(* boxing checks only with interpretation                                  *)
     | ArrayDef of bool * t list
     | ArrayImp of t * t list
 
@@ -71,9 +68,9 @@ module Expr =
          "[" args:!(Util.list0 parse) "]" { ArrayDef (false, args) }
          | "{" args:!(Util.list0 parse) "}" { ArrayDef (true, args) };
         
-      array_imp_arg :   inline_array | call_or_var;
+      array_imp_arg : inline_array | call_or_var;
       
-      array_imp : ar:array_imp_arg args:(-"[" parse -"]")+ { ArrayImp (ar, args) };
+      array_imp : ar: array_imp_arg args: (-"[" parse -"]") + { ArrayImp (ar, args) };
       
       const : n:!(Value.parse) { Const n };
 
@@ -131,9 +128,10 @@ module Stmt =
 	  Seq (i, While (c, Seq (b, s)))
         }
         
-      | ar :!(Expr.array_imp_arg) args:(-"[" !(Expr.parse) -"]")+ ":=" e:!(Expr.parse)
+      | ar :!(Expr.array_imp_arg) args: (-"[" !(Expr.parse) -"]") + ":=" e:!(Expr.parse)
        { ArrayAssign (ar, args, e) }
-     (* | ar:!(Expr.parse) args:(-"[" !(Expr.parse) -"]")+  { ArrayImp (ar, args) }*)
+    (* | ar:!(Expr.parse) args:(-"[" !(Expr.parse) -"]")+ { ArrayImp (ar,  *)
+		(* args) }                                                             *)
     )
 
   end

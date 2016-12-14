@@ -21,6 +21,7 @@ module MAP = Map.Make(String)
 
 module Interpreter =
 struct
+  (*
   let call_ctx_keeper = ref MAP.empty;;
   let add_call_ctx name args body = call_ctx_keeper := MAP.add name (args, body) !call_ctx_keeper;;
   let get_call_ctx name = MAP.find name !call_ctx_keeper;;
@@ -34,6 +35,7 @@ struct
         x
   ;;
   
+
   let rec run (state, stack, input, output) code =
     let rec map_labels l code' =
       match code' with
@@ -109,6 +111,7 @@ struct
     List.map (fun (name, (args, body)) -> add_call_ctx name args body) defs;
     run ([], [], input, []) main_body
   ;;
+*)
 end
 
 module Compile =

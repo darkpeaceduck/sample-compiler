@@ -37,8 +37,7 @@ let main = ()
 	 | `X86 ->
              let basename = Filename.chop_suffix filename ".expr" in 
 	     X86.build stmt basename
-	 | _ -> Printf.printf "here\n"
-    (*
+	 | _ -> 
 	     let rec read acc =
 	       try
 		 let r = read_int () in
@@ -51,10 +50,10 @@ let main = ()
 	       match mode with
 	       | `SM -> 
            []
-	       | _ -> []
+	       | _ -> 
+          Interpreter.Stmt.eval_unit input stmt
 	     in
-	     List.iter (fun i -> Printf.printf "%d\n" i) output
-      *)
+	     List.iter (fun i -> Printf.printf "%s\n" (Interpreter.Builtins.to_str(i))) output
 	)
 
     | `Fail er -> Printf.eprintf "errored %s\n" er

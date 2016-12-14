@@ -1,22 +1,65 @@
+
+
+module Builtins =
+struct
+  type t = Int of int | String of bytes | Array of t array
+  let to_str = function
+    | Int a -> string_of_int(a)
+    | String b -> Bytes.to_string(b)
+    | _ -> ""
+  
+  let of_value = function
+    | Language.Value.Int a -> Int a
+    | Language.Value.String b -> String b
+  
+  let of_list li boxed =
+    Array (Array.of_list (List.map (fun arg ->
+                  if boxed then
+                    arg
+                  else
+                    match arg with
+                    | Int a -> Int a
+                    | _ -> failwith "unboxed with not int value"
+            )li))
+  let to_bool : t -> bool = function
+    | Int a -> a <> 0
+    | String b -> (Bytes.length b) > 0
+  
+  let strset co = function
+    | (String s)::(Int i)::(Int c)::[] ->
+    Bytes.set s i (Char.chr c);
+    (co, String s)
+  let strget c = function
+    | (String s)::(Int i)::[] -> (c, String (Bytes.make 1 (Bytes.get s i)))
+  let strmake c [(Int n), (Int c)] = (c, String (Bytes.make n (Char.chr c)))
+  let strdup c [(String s)] = (c, String (Bytes.copy s))
+  let strcat c [(String s1), (String s2)] = (c, String (Bytes.cat s1 s2))
+  let read (inp, out) _ = 
+    let x::inp' = inp in 
+    ((inp', out), Int x)
+  let write (inp, out) = function
+    | x::[] ->
+    ((inp, out @ [x]), Int 0)
+    
+  let invoke name c args = 
+    match name with
+    | "strset" -> strset c args
+    | "strget" -> strget c args
+    | "read"   -> read c args
+    | "write"  -> write c args
+end
+
 module Expr =
 struct
   
   open Language.Expr
-  open Language.Value
+  open Builtins
   
   let bool2int arg =
     if arg then 1 else 0
   ;;
   
-  let invoke_binop str a' b' =
-    let check = function
-      | Int k -> k
-      | String b -> failwith "binop on strings"
-    in
-    let a = check a'
-    in
-    let b = check b'
-    in
+  let invoke_binop str (Int a) (Int b) =
     let result =
       match str with
       | "+" -> a + b
@@ -37,10 +80,11 @@ struct
   ;;
   
   let rec eval ((state, input, output) as c) call_f = function
-    | Const n -> (input, output, n)
+    | Const n -> (input, output, of_value(n))
     | Var x -> (input, output, state x)
     | Binop (str, a, b) ->
-        let eval' arg input output = eval c call_f arg in
+    (* fuckup below probably *)
+        let eval' arg input output = eval (state, input, output) call_f arg in
         let (input', output', rc1) = eval' a input output in
         let (input'', output'', rc2) = eval' b input' output' in
         let result = invoke_binop str rc1 rc2 in
@@ -48,6 +92,13 @@ struct
     | Call (name, args) ->
         let (new_inp, new_outp, (rc, _)) = call_f name args c in
         (new_inp, new_outp, rc)
+    | ArrayDef (boxed, list) ->
+        let (unboxed_list, input', output') =
+          List.fold_left (fun (res, input, output) arg ->
+                  let (input', output', rc) = eval (state, input, output) call_f arg in
+                  ([rc] @ res, input', output')) ([], input, output) list
+        in
+        (input', output', (of_list unboxed_list boxed))
 end
 
 module MAP = Map.Make(String)
@@ -56,7 +107,7 @@ module Stmt =
 struct
   
   open Language.Stmt
-  open Language.Value
+  open Builtins
   
   let call_ctx_keeper = ref MAP.empty;;
   let add_call_ctx name args body = call_ctx_keeper := MAP.add name (args, body) !call_ctx_keeper;;
@@ -65,12 +116,19 @@ struct
     let (args, (inp', outp')) =
       List.fold_left (fun (unpacked_args', (inp, outp)) arg ->
               let (e_inp, e_outp, rc) = Expr.eval (state, inp, outp) (call eval) arg in
-              ([rc] @ unpacked_args', (e_inp, e_outp))) ([], (input, output)) packed_args
-    in
-    let (fun_args, stmt) = MAP.find name !call_ctx_keeper in
-    let new_state = List.fold_left2 (fun res arg_value fun_arg -> [(fun_arg, arg_value)] @ res)
-        [] args fun_args in
-    eval new_state inp' outp' stmt
+              ([rc] @ unpacked_args', (e_inp, e_outp))) ([], (input, output)) packed_args in
+    Printf.printf "SUKA ";
+    List.iter (fun a-> Printf.printf "arg %s " (to_str a)) args;
+    Printf.printf "\n";
+    try
+      let (fun_args, stmt) = MAP.find name !call_ctx_keeper in
+      let new_state = List.fold_left2 (fun res arg_value fun_arg -> [(fun_arg, arg_value)] @ res)
+          [] args fun_args in
+      eval new_state inp' outp' stmt
+    with
+    | Not_found -> 
+      let ((inp'', out''), res) = Builtins.invoke name (inp', outp') args in
+      (inp'', out'', (res, false))
   
   let rec eval_stmt state input output stmt =
     let rec eval' ((state, input, output, ret) as c) stmt =
@@ -94,12 +152,6 @@ struct
         | Assign (x, e) ->
             let (e_inp, e_outp, rc) = eval_expr c e in
             ((x, rc) :: state, e_inp , e_outp, ret)
-        | Write e ->
-            let (e_inp, e_outp, rc) = eval_expr c e in
-            (state, e_inp, e_outp @ [rc], ret)
-        | Read x ->
-            let y:: input' = input in
-            ((x, y) :: state, input', output, ret)
         | If (cond, e1, e2) ->
             let (e_inp, e_out, rc) = eval_expr c cond in
             let selected_expr =
@@ -110,8 +162,8 @@ struct
             let ref_context = ref c in
             while ((check_returned !ref_context) == false &&
               to_bool(let (e_inp, e_outp, rc) = eval_expr !ref_context cond in
-                ref_context := ((retrieve_state !ref_context), e_inp, e_outp, ret);
-                rc )) do
+                  ref_context := ((retrieve_state !ref_context), e_inp, e_outp, ret);
+                  rc )) do
               ref_context := eval' (!ref_context) e;
             done;
             !ref_context
