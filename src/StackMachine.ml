@@ -34,17 +34,23 @@ struct
         stack_ctx_keeper := xs;
         x
   ;;
-  let rec map_labels l code' =
+
+  let map_labels_keepr = ref [];;
+  let rec map_labels code' =
       match code' with
-      | [] -> l
+      | [] -> ()
       | i:: code'' ->
           match i with
-          | S_LABEL s -> map_labels ((s, code''):: l) code''
-          | _ -> map_labels l code''
+          | S_LABEL s -> 
+            map_labels_keepr :=(s, code'')::!map_labels_keepr;
+             map_labels code''
+          | _ -> map_labels code''
 
-  let run_glob (state, stack, input, output) code label_map =
   let rec run (state, stack, input, output) code =
-    let get_code_by_label s = List.assoc s label_map in
+    let get_code_by_label s = try
+      List.assoc s !map_labels_keepr
+    with
+    | Not_found -> failwith "HU" in
     let rec run' ((state, stack, input, output) as c) code =
       let rec call_get_state stack args =
         match args with
@@ -69,7 +75,7 @@ struct
       let rec split i y x' =
         match x' with
         | [] -> if i == 0 then (y, [] ) else failwith "wrong argument"
-        | x:: xs -> if i == 0 then (y, xs) else split (i -1) (y @ [x]) xs
+        | x:: xs -> if i == 0 then (y, x::xs) else split (i -1) (y @ [x]) xs
       in
       match code with
       | [] -> output
@@ -93,7 +99,6 @@ struct
               run' c code'
           | S_COND s ->
               let a:: stack' = stack in
-              (*Printf.printf "cond %s\n" (to_str (List.assoc "i" state));*)
               if to_bool(a) == false then
                 run' (state, stack', input, output) (get_code_by_label s)
               else run' (state, stack', input, output) code'
@@ -101,11 +106,18 @@ struct
               let (args, body) = get_call_ctx name in
               call (c, code') (List.rev args) body 
           | S_BUILTIN (name, n_args) ->
+              
               let (args, stack') = split (n_args) [] stack in
-              (*Printf.printf "func : %s" name;
+              (*Printf.printf "stack : %s" name;
+              List.iter (fun a -> Printf.printf " [%s] " (to_str a)) stack; 
+              Printf.printf "\n" ;
+              Printf.printf "func : %s" name;
               List.iter (fun a -> Printf.printf " [%s] " (to_str a)) args; 
               Printf.printf "\n" ;
-              *)
+              Printf.printf "left : %s" name;
+              List.iter (fun a -> Printf.printf " [%s] " (to_str a)) stack'; 
+              Printf.printf "\n" ; *)
+              
               let ((input', output'), res) = invoke name (input, output) (List.rev args) in
               run' (state, res:: stack', input', output') code'
           | S_RET ->
@@ -113,7 +125,7 @@ struct
               ret input output a
           | S_ARRAY (boxed, n_args) ->
               let (args, stack') = split (n_args) [] stack in
-              let ar = of_list args boxed in
+              let ar = of_list (List.rev args) boxed in
               run' (state, ar:: stack', input, output) code'
           | S_ELEM (n_args) ->
             let (args, stack') = split (n_args) [] stack in
@@ -125,14 +137,13 @@ struct
             run' (state, res:: stack', input, output) code'
     in
     run' (state, stack, input, output) code
- in run (state, stack, input, output) code
     
  let run_unit input (defs, main_body) =
-    let map_lbls = ref (map_labels [] main_body) in
+    map_labels main_body;
     List.iter (fun (_, (_, body)) -> 
-      map_lbls := map_labels !map_lbls body) defs;
+      map_labels body) defs;
     List.map (fun (name, (args, body)) -> add_call_ctx name args body) defs;
-    run_glob ([], [], input, []) main_body !map_lbls
+    run ([], [], input, []) main_body
   ;;
 end
 
