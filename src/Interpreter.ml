@@ -24,15 +24,25 @@ struct
   let to_bool : t -> bool = function
     | Int a -> a <> 0
     | String b -> (Bytes.length b) > 0
+
+  let rec arrget = function
+    | (Array a)::(Int i)::xs -> arrget ([Array.get a i] @ xs) 
+    | x :: [] -> x
+
+  let rec arrset = function
+    | (Array a)::(Int i) :: x :: [] -> 
+      Array.set a i x;
+      Array a 
+    | (Array a)::(Int i)::xs -> arrset ([Array.get a i] @ xs) 
   
   let strset co = function
-    | (String s)::(Int i)::(Int c)::[] ->
-    Bytes.set s i (Char.chr c);
-    (co, String s)
+    | (String s):: (Int i):: (Int c)::[] ->
+        Bytes.set s i (Char.chr c);
+        (co, String s)
   let strget c = function
-    | (String s)::(Int i)::[] -> (c, Int (Char.code(Bytes.get s i)))
+    | (String s):: (Int i)::[] -> (c, Int (Char.code(Bytes.get s i)))
   let strmake co = function
-    | (Int n)::(Int c)::[]  -> (co, String (Bytes.make n (Char.chr c)))
+    | (Int n):: (Int c)::[] -> (co, String (Bytes.make n (Char.chr c)))
   let strdup c = function
     | (String s)::[] -> (c, String (Bytes.copy s))
   let strcat c = function
@@ -43,26 +53,26 @@ struct
     | (String s) :: [] -> (co, Int(Bytes.length s))
   let strsub co = function
     | (String s) :: (Int i) :: (Int l) :: []-> (co, String(Bytes.sub s i l))
-  let read (inp, out) _ = 
-    let x::inp' = inp in 
+  let read (inp, out) _ =
+    let x:: inp' = inp in
     ((inp', out), Int x)
   let write (inp, out) = function
     | x::[] ->
-    ((inp, out @ [x]), Int 0)
-    
-  let invoke name c args = 
+        ((inp, out @ [x]), Int 0)
+  
+  let invoke name c args =
     match name with
     | "strset" -> strset c args
     | "strget" -> strget c args
     | "strdup" -> strdup c args
     | "strcat" -> strcat c args
-    | "strmake"-> strmake c args
-    | "strcmp" -> strcmp c args 
+    | "strmake" -> strmake c args
+    | "strcmp" -> strcmp c args
     | "strlen" -> strlen c args
     | "strsub" -> strsub c args
-    | "read"   -> read c args
-    | "write"  -> write c args
-    | _        -> failwith "Builtin not found"
+    | "read" -> read c args
+    | "write" -> write c args
+    | _ -> failwith "Builtin not found"
 end
 
 module Expr =
@@ -95,6 +105,11 @@ struct
     Int result
   ;;
   
+  let rec eval_list eval (state, input, output) call_f list =
+    List.fold_left (fun (res, input, output) arg ->
+            let (input', output', rc) = eval (state, input, output) call_f arg in
+            ([rc] @ res, input', output')) ([], input, output) list
+  
   let rec eval ((state, input, output) as c) call_f = function
     | Const n -> (input, output, of_value(n))
     | Var x -> (input, output, state x)
@@ -109,12 +124,16 @@ struct
         let (new_inp, new_outp, (rc, _)) = call_f name args c in
         (new_inp, new_outp, rc)
     | ArrayDef (boxed, list) ->
-        let (unboxed_list, input', output') =
-          List.fold_left (fun (res, input, output) arg ->
-                  let (input', output', rc) = eval (state, input, output) call_f arg in
-                  ([rc] @ res, input', output')) ([], input, output) list
+        let (unboxed_list, input', output') = eval_list eval c call_f list
         in
         (input', output', (of_list unboxed_list boxed))
+    
+    | ArrayImp (ar, args) -> 
+      let (input', output', ar_unpacked) = eval c call_f ar in
+      let (unboxed_list, input'', output'') = eval_list eval (state, input', output') call_f args
+      in
+      (input'', output'', arrget ([ar_unpacked] @  unboxed_list))
+  
 end
 
 module MAP = Map.Make(String)
@@ -133,19 +152,17 @@ struct
       List.fold_left (fun (unpacked_args', (inp, outp)) arg ->
               let (e_inp, e_outp, rc) = Expr.eval (state, inp, outp) (call eval) arg in
               ( unpacked_args' @ [rc], (e_inp, e_outp))) ([], (input, output)) packed_args in
-    (*Printf.printf "SUKA ";  
-    List.iter (fun a-> Printf.printf "arg %s " (to_str a)) args;
-    Printf.printf "\n";
-    *)
+    (* Printf.printf "SUKA "; List.iter (fun a-> Printf.printf "arg %s "       *)
+    (* (to_str a)) args; Printf.printf "\n";                                   *)
     try
       let (fun_args, stmt) = MAP.find name !call_ctx_keeper in
       let new_state = List.fold_left2 (fun res arg_value fun_arg -> [(fun_arg, arg_value)] @ res)
           [] args fun_args in
       eval new_state inp' outp' stmt
     with
-    | Not_found -> 
-      let ((inp'', out''), res) = Builtins.invoke name (inp', outp') args in
-      (inp'', out'', (res, false))
+    | Not_found ->
+        let ((inp'', out''), res) = Builtins.invoke name (inp', outp') args in
+        (inp'', out'', (res, false))
   
   let rec eval_stmt state input output stmt =
     let rec eval' ((state, input, output, ret) as c) stmt =
@@ -190,6 +207,16 @@ struct
         | Return e ->
             let (e_inp, e_out, rc) = eval_expr c e in
             (state, e_inp, e_out, (rc, true))
+            
+         | ArrayAssign (ar,  args,  value) ->
+          let (input', output', ar_unpacked) = eval_expr c ar in
+          let c = (state, input', output', ret) in 
+          let (unboxed_list, input'', output'') = 
+            Expr.eval_list Expr.eval (state_f c, input', output') (call eval_stmt) args
+          in
+          let c = (state, input'', output'', ret) in
+          let (input'', output'', value_unpacked) = eval_expr c value in
+          (state, input'', output'', (arrset ([ar_unpacked] @  unboxed_list @ [value_unpacked]), false))
     in
     let (_, input, output, ret) = eval' (state, input, output, (Int 0, false)) stmt in
     (input, output, ret)
