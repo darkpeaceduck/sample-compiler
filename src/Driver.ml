@@ -5,8 +5,14 @@ let parse infile =
   Util.parse
     (object
        inherit Matcher.t s
-       inherit Util.Lexers.ident ["read"; "write"; "skip"] s
+       inherit Util.Lexers.ident [
+         "skip"; "if"; "else"; "elif"; "fi";
+         "while"; "do"; "od"; "repeat"; "until";
+         "for"; "fun"; "return"
+       ] s
        inherit Util.Lexers.decimal s
+       inherit Util.Lexers.char s
+       inherit Util.Lexers.string s
        inherit Util.Lexers.skip [
 	 Matcher.Skip.whitespaces " \t\n";
 	 Matcher.Skip.lineComment "--";
@@ -14,7 +20,7 @@ let parse infile =
        ] s
      end
     )
-    (ostap (!(Language.Stmt.parse) -EOF))
+    (ostap (!(Language.Unit.parse) - EOF))
 
 let main = ()
   try
@@ -31,7 +37,7 @@ let main = ()
 	 | `X86 ->
              let basename = Filename.chop_suffix filename ".expr" in 
 	     X86.build stmt basename
-	 | _ ->
+	 | _ -> 
 	     let rec read acc =
 	       try
 		 let r = read_int () in
@@ -42,14 +48,17 @@ let main = ()
 	     let input = read [] in
 	     let output =
 	       match mode with
-	       | `SM -> StackMachine.Interpreter.run input (StackMachine.Compile.stmt stmt)
-	       | _   -> Interpreter.Stmt.eval input stmt
+	       | `SM -> 
+          StackMachine.Interpreter.run_unit input (StackMachine.Compile.unit stmt)
+	       | _ -> 
+          Interpreter.Stmt.eval_unit input stmt
 	     in
-	     List.iter (fun i -> Printf.printf "%d\n" i) output
+	     List.iter (fun i -> Printf.printf "%s\n" (Interpreter.Builtins.to_str(i))) output
 	)
 
-    | `Fail er -> Printf.eprintf "%s\n" er
+    | `Fail er -> Printf.eprintf "errored %s\n" er
   with 
-  | Invalid_argument _ ->
+  | Invalid_argument er ->
+      Printf.printf "INVALID : %s" er;
       Printf.printf "Usage: rc.byte <command> <name.expr>\n";
       Printf.printf "  <command> should be one of: -i, -s, -o\n"
