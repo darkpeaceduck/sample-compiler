@@ -49,7 +49,7 @@ let main = ()
 	     let output =
 	       match mode with
 	       | `SM -> 
-           []
+          StackMachine.Interpreter.run_unit input (StackMachine.Compile.unit stmt)
 	       | _ -> 
           Interpreter.Stmt.eval_unit input stmt
 	     in

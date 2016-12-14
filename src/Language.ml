@@ -6,9 +6,9 @@ module Value =
   struct
      type t = Int of int | String of bytes
      
-     let to_string : t -> string = function
+    let to_string : t -> string = function
       | Int a -> string_of_int a
-      | String b -> Bytes.to_string(b) 
+      | String b -> Bytes.to_string(b)
       ostap (
         parse:
         s: STRING { String (String.sub s 1 (String.length s - 2)) }

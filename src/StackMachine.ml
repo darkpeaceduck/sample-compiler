@@ -21,7 +21,7 @@ module MAP = Map.Make(String)
 
 module Interpreter =
 struct
-  (*
+  open Interpreter.Builtins
   let call_ctx_keeper = ref MAP.empty;;
   let add_call_ctx name args body = call_ctx_keeper := MAP.add name (args, body) !call_ctx_keeper;;
   let get_call_ctx name = MAP.find name !call_ctx_keeper;;
@@ -34,19 +34,17 @@ struct
         stack_ctx_keeper := xs;
         x
   ;;
-  
-
-  let rec run (state, stack, input, output) code =
-    let rec map_labels l code' =
+  let rec map_labels l code' =
       match code' with
       | [] -> l
       | i:: code'' ->
           match i with
           | S_LABEL s -> map_labels ((s, code''):: l) code''
           | _ -> map_labels l code''
-    in
-    let label_map = map_labels [] code in
-    let get_code_by_label s = (List.assoc s label_map) in
+
+  let run_glob (state, stack, input, output) code label_map =
+  let rec run (state, stack, input, output) code =
+    let get_code_by_label s = List.assoc s label_map in
     let rec run' ((state, stack, input, output) as c) code =
       let rec call_get_state stack args =
         match args with
@@ -68,18 +66,17 @@ struct
             let (state, stack, body) = pop_stack_ctx() in
             run (state, value:: stack, input, output) body
       in
+      let rec split i y x' =
+        match x' with
+        | [] -> if i == 0 then (y, [] ) else failwith "wrong argument"
+        | x:: xs -> if i == 0 then (y, xs) else split (i -1) (y @ [x]) xs
+      in
       match code with
       | [] -> output
       | i:: code' ->
           match i with
-          | S_READ ->
-              let y:: input' = input in
-              run' (state, y:: stack, input', output) code'
-          | S_WRITE ->
-              let y:: stack' = stack in
-              run' (state, stack', input, output @ [y]) code'
           | S_PUSH n ->
-              run' (state, n:: stack, input, output) code'
+              run' (state, of_value(n):: stack, input, output) code'
           | S_LD x ->
               run' (state, (List.assoc x state):: stack, input, output) code'
           | S_ST x ->
@@ -90,28 +87,53 @@ struct
               let invoke_res = Interpreter.Expr.invoke_binop s a b in
               run' (state, invoke_res:: stack', input, output) code'
           | S_JMP s ->
+              (*Printf.printf "jump %s\n" (to_str (List.assoc "i" state));*)
               run' c (get_code_by_label s)
           | S_LABEL s ->
               run' c code'
           | S_COND s ->
               let a:: stack' = stack in
-              if Value.to_bool(a) == false then 
-                run' (state, stack', input, output) (get_code_by_label s) 
+              (*Printf.printf "cond %s\n" (to_str (List.assoc "i" state));*)
+              if to_bool(a) == false then
+                run' (state, stack', input, output) (get_code_by_label s)
               else run' (state, stack', input, output) code'
           | S_CALL (name, n_args) ->
               let (args, body) = get_call_ctx name in
-              call (c, code') args body
+              call (c, code') (List.rev args) body 
+          | S_BUILTIN (name, n_args) ->
+              let (args, stack') = split (n_args) [] stack in
+              (*Printf.printf "func : %s" name;
+              List.iter (fun a -> Printf.printf " [%s] " (to_str a)) args; 
+              Printf.printf "\n" ;
+              *)
+              let ((input', output'), res) = invoke name (input, output) (List.rev args) in
+              run' (state, res:: stack', input', output') code'
           | S_RET ->
               let a:: stack' = stack in
               ret input output a
+          | S_ARRAY (boxed, n_args) ->
+              let (args, stack') = split (n_args) [] stack in
+              let ar = of_list args boxed in
+              run' (state, ar:: stack', input, output) code'
+          | S_ELEM (n_args) ->
+            let (args, stack') = split (n_args) [] stack in
+            let res = arrget (List.rev args) in
+            run' (state, res:: stack', input, output) code'
+          | S_STA (n_args) ->
+            let (args, stack') = split (n_args) [] stack in
+            let res = arrset (List.rev args) in
+            run' (state, res:: stack', input, output) code'
     in
     run' (state, stack, input, output) code
-  ;;
-  let run_unit input (defs, main_body) =
+ in run (state, stack, input, output) code
+    
+ let run_unit input (defs, main_body) =
+    let map_lbls = ref (map_labels [] main_body) in
+    List.iter (fun (_, (_, body)) -> 
+      map_lbls := map_labels !map_lbls body) defs;
     List.map (fun (name, (args, body)) -> add_call_ctx name args body) defs;
-    run ([], [], input, []) main_body
+    run_glob ([], [], input, []) main_body !map_lbls
   ;;
-*)
 end
 
 module Compile =
@@ -125,20 +147,20 @@ struct
   let label_counter = ref 0;;
   let label_generate () = label_counter:=!label_counter + 1; "label"^(string_of_int(!label_counter)) ;;
   
-  let unfold_list_expr exec args = 
+  let unfold_list_expr exec args =
     List.fold_left (fun res arg -> res @ exec arg) [] args
-    
+  
   let rec expr = function
     | Var x -> [S_LD x]
     | Const n -> [S_PUSH n]
     | Binop (s, x, y) -> expr x @ expr y @ [S_BINOP s]
     | Call (s, args) ->
-       unfold_list_expr expr args @ [S_CALL (s, (List.length args))]
-    | ArrayDef (boxed, args) -> 
-      unfold_list_expr expr args @ [S_ARRAY (boxed, List.length args)]
-      
-     | ArrayImp (ar, args) ->
-       expr ar @ unfold_list_expr expr args  @ [S_ELEM ((List.length args)+1)]
+        unfold_list_expr expr args @ [S_CALL (s, (List.length args))]
+    | ArrayDef (boxed, args) ->
+        unfold_list_expr expr args @ [S_ARRAY (boxed, List.length args)]
+    
+    | ArrayImp (ar, args) ->
+        expr ar @ unfold_list_expr expr args @ [S_ELEM ((List.length args) +1)]
   
   let rec stmt = function
     | Skip -> []
@@ -159,9 +181,9 @@ struct
         expr e @ [S_RET]
     | Call (s, args) ->
         List.fold_left (fun res arg -> res @ expr arg) [] args @ [S_CALL (s, (List.length args))]
-        
+    
     | ArrayAssign (ar, args, e) ->
-        expr ar @  unfold_list_expr expr args @ expr e @ [S_STA ((List.length args) + 2)]
+        expr ar @ unfold_list_expr expr args @ expr e @ [S_STA ((List.length args) + 2)]
   
   let rec retrive_builtins defs = function
     | [] -> []
