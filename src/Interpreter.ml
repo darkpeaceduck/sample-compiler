@@ -30,10 +30,19 @@ struct
     Bytes.set s i (Char.chr c);
     (co, String s)
   let strget c = function
-    | (String s)::(Int i)::[] -> (c, String (Bytes.make 1 (Bytes.get s i)))
-  let strmake c [(Int n), (Int c)] = (c, String (Bytes.make n (Char.chr c)))
-  let strdup c [(String s)] = (c, String (Bytes.copy s))
-  let strcat c [(String s1), (String s2)] = (c, String (Bytes.cat s1 s2))
+    | (String s)::(Int i)::[] -> (c, Int (Char.code(Bytes.get s i)))
+  let strmake co = function
+    | (Int n)::(Int c)::[]  -> (co, String (Bytes.make n (Char.chr c)))
+  let strdup c = function
+    | (String s)::[] -> (c, String (Bytes.copy s))
+  let strcat c = function
+    | (String s1) :: (String s2) :: [] -> (c, String (Bytes.cat s1 s2))
+  let strcmp co = function
+    | (String s1) :: (String s2) :: [] -> (co, Int (Bytes.compare s1 s2))
+  let strlen co = function
+    | (String s) :: [] -> (co, Int(Bytes.length s))
+  let strsub co = function
+    | (String s) :: (Int i) :: (Int l) :: []-> (co, String(Bytes.sub s i l))
   let read (inp, out) _ = 
     let x::inp' = inp in 
     ((inp', out), Int x)
@@ -45,8 +54,15 @@ struct
     match name with
     | "strset" -> strset c args
     | "strget" -> strget c args
+    | "strdup" -> strdup c args
+    | "strcat" -> strcat c args
+    | "strmake"-> strmake c args
+    | "strcmp" -> strcmp c args 
+    | "strlen" -> strlen c args
+    | "strsub" -> strsub c args
     | "read"   -> read c args
     | "write"  -> write c args
+    | _        -> failwith "Builtin not found"
 end
 
 module Expr =
@@ -116,10 +132,11 @@ struct
     let (args, (inp', outp')) =
       List.fold_left (fun (unpacked_args', (inp, outp)) arg ->
               let (e_inp, e_outp, rc) = Expr.eval (state, inp, outp) (call eval) arg in
-              ([rc] @ unpacked_args', (e_inp, e_outp))) ([], (input, output)) packed_args in
-    Printf.printf "SUKA ";
+              ( unpacked_args' @ [rc], (e_inp, e_outp))) ([], (input, output)) packed_args in
+    (*Printf.printf "SUKA ";  
     List.iter (fun a-> Printf.printf "arg %s " (to_str a)) args;
     Printf.printf "\n";
+    *)
     try
       let (fun_args, stmt) = MAP.find name !call_ctx_keeper in
       let new_state = List.fold_left2 (fun res arg_value fun_arg -> [(fun_arg, arg_value)] @ res)
