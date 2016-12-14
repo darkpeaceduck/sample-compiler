@@ -24,16 +24,16 @@ struct
   let to_bool : t -> bool = function
     | Int a -> a <> 0
     | String b -> (Bytes.length b) > 0
-
+  
   let rec arrget = function
-    | (Array a)::(Int i)::xs -> arrget ([Array.get a i] @ xs) 
+    | (Array a):: (Int i):: xs -> arrget ([Array.get a i] @ xs)
     | x :: [] -> x
-
+  
   let rec arrset = function
-    | (Array a)::(Int i) :: x :: [] -> 
-      Array.set a i x;
-      Array a 
-    | (Array a)::(Int i)::xs -> arrset ([Array.get a i] @ xs) 
+    | (Array a):: (Int i) :: x :: [] ->
+        Array.set a i x;
+        Array a
+    | (Array a):: (Int i):: xs -> arrset ([Array.get a i] @ xs)
   
   let strset co = function
     | (String s):: (Int i):: (Int c)::[] ->
@@ -59,10 +59,10 @@ struct
   let write (inp, out) = function
     | x::[] ->
         ((inp, out @ [x]), Int 0)
-        
+  
   let arrmake co = function
     | (Int n) :: (Int v) :: [] -> (co, Array (Array.make n (Int v)))
-
+  
   let arrmake_boxed co = function
     | (Int n) :: t :: [] -> (co, Array (Array.make n t))
   
@@ -82,7 +82,7 @@ struct
     | "write" -> write c args
     | "arrmake" -> arrmake c args
     | "Arrmake" -> arrmake_boxed c args
-    | "arrlen"  -> arrlen c args
+    | "arrlen" -> arrlen c args
     | _ -> failwith "Builtin not found"
 end
 
@@ -125,7 +125,6 @@ struct
     | Const n -> (input, output, of_value(n))
     | Var x -> (input, output, state x)
     | Binop (str, a, b) ->
-    (* fuckup below probably *)
         let eval' arg input output = eval (state, input, output) call_f arg in
         let (input', output', rc1) = eval' a input output in
         let (input'', output'', rc2) = eval' b input' output' in
@@ -139,11 +138,11 @@ struct
         in
         (input', output', (of_list unboxed_list boxed))
     
-    | ArrayImp (ar, args) -> 
-      let (input', output', ar_unpacked) = eval c call_f ar in
-      let (unboxed_list, input'', output'') = eval_list eval (state, input', output') call_f args
-      in
-      (input'', output'', arrget ([ar_unpacked] @  unboxed_list))
+    | ArrayImp (ar, args) ->
+        let (input', output', ar_unpacked) = eval c call_f ar in
+        let (unboxed_list, input'', output'') = eval_list eval (state, input', output') call_f args
+        in
+        (input'', output'', arrget ([ar_unpacked] @ unboxed_list))
   
 end
 
@@ -163,8 +162,6 @@ struct
       List.fold_left (fun (unpacked_args', (inp, outp)) arg ->
               let (e_inp, e_outp, rc) = Expr.eval (state, inp, outp) (call eval) arg in
               ( unpacked_args' @ [rc], (e_inp, e_outp))) ([], (input, output)) packed_args in
-    (* Printf.printf "SUKA "; List.iter (fun a-> Printf.printf "arg %s "       *)
-    (* (to_str a)) args; Printf.printf "\n";                                   *)
     try
       let (fun_args, stmt) = MAP.find name !call_ctx_keeper in
       let new_state = List.fold_left2 (fun res arg_value fun_arg -> [(fun_arg, arg_value)] @ res)
@@ -218,16 +215,16 @@ struct
         | Return e ->
             let (e_inp, e_out, rc) = eval_expr c e in
             (state, e_inp, e_out, (rc, true))
-            
-         | ArrayAssign (ar,  args,  value) ->
-          let (input', output', ar_unpacked) = eval_expr c ar in
-          let c = (state, input', output', ret) in 
-          let (unboxed_list, input'', output'') = 
-            Expr.eval_list Expr.eval (state_f c, input', output') (call eval_stmt) args
-          in
-          let c = (state, input'', output'', ret) in
-          let (input'', output'', value_unpacked) = eval_expr c value in
-          (state, input'', output'', (arrset ([ar_unpacked] @  unboxed_list @ [value_unpacked]), false))
+        
+        | ArrayAssign (ar, args, value) ->
+            let (input', output', ar_unpacked) = eval_expr c ar in
+            let c = (state, input', output', ret) in
+            let (unboxed_list, input'', output'') =
+              Expr.eval_list Expr.eval (state_f c, input', output') (call eval_stmt) args
+            in
+            let c = (state, input'', output'', ret) in
+            let (input'', output'', value_unpacked) = eval_expr c value in
+            (state, input'', output'', (arrset ([ar_unpacked] @ unboxed_list @ [value_unpacked]), false))
     in
     let (_, input, output, ret) = eval' (state, input, output, (Int 0, false)) stmt in
     (input, output, ret)

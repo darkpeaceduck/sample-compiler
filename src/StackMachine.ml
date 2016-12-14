@@ -1,8 +1,6 @@
 open Language
 
 type i =
-  | S_READ
-  | S_WRITE
   | S_PUSH of Language.Value.t
   | S_LD of string
   | S_ST of string
@@ -34,23 +32,23 @@ struct
         stack_ctx_keeper := xs;
         x
   ;;
-
+  
   let map_labels_keepr = ref [];;
   let rec map_labels code' =
-      match code' with
-      | [] -> ()
-      | i:: code'' ->
-          match i with
-          | S_LABEL s -> 
-            map_labels_keepr :=(s, code'')::!map_labels_keepr;
-             map_labels code''
-          | _ -> map_labels code''
-
+    match code' with
+    | [] -> ()
+    | i:: code'' ->
+        match i with
+        | S_LABEL s ->
+            map_labels_keepr := (s, code'')::!map_labels_keepr;
+            map_labels code''
+        | _ -> map_labels code''
+  
   let rec run (state, stack, input, output) code =
     let get_code_by_label s = try
-      List.assoc s !map_labels_keepr
-    with
-    | Not_found -> failwith "HU" in
+        List.assoc s !map_labels_keepr
+      with
+      | Not_found -> failwith "HU" in
     let rec run' ((state, stack, input, output) as c) code =
       let rec call_get_state stack args =
         match args with
@@ -75,7 +73,7 @@ struct
       let rec split i y x' =
         match x' with
         | [] -> if i == 0 then (y, [] ) else failwith "wrong argument"
-        | x:: xs -> if i == 0 then (y, x::xs) else split (i -1) (y @ [x]) xs
+        | x:: xs -> if i == 0 then (y, x:: xs) else split (i -1) (y @ [x]) xs
       in
       match code with
       | [] -> output
@@ -93,7 +91,6 @@ struct
               let invoke_res = Interpreter.Expr.invoke_binop s a b in
               run' (state, invoke_res:: stack', input, output) code'
           | S_JMP s ->
-              (*Printf.printf "jump %s\n" (to_str (List.assoc "i" state));*)
               run' c (get_code_by_label s)
           | S_LABEL s ->
               run' c code'
@@ -104,20 +101,10 @@ struct
               else run' (state, stack', input, output) code'
           | S_CALL (name, n_args) ->
               let (args, body) = get_call_ctx name in
-              call (c, code') (List.rev args) body 
+              call (c, code') (List.rev args) body
           | S_BUILTIN (name, n_args) ->
-              
+          
               let (args, stack') = split (n_args) [] stack in
-              (*Printf.printf "stack : %s" name;
-              List.iter (fun a -> Printf.printf " [%s] " (to_str a)) stack; 
-              Printf.printf "\n" ;
-              Printf.printf "func : %s" name;
-              List.iter (fun a -> Printf.printf " [%s] " (to_str a)) args; 
-              Printf.printf "\n" ;
-              Printf.printf "left : %s" name;
-              List.iter (fun a -> Printf.printf " [%s] " (to_str a)) stack'; 
-              Printf.printf "\n" ; *)
-              
               let ((input', output'), res) = invoke name (input, output) (List.rev args) in
               run' (state, res:: stack', input', output') code'
           | S_RET ->
@@ -128,20 +115,20 @@ struct
               let ar = of_list (List.rev args) boxed in
               run' (state, ar:: stack', input, output) code'
           | S_ELEM (n_args) ->
-            let (args, stack') = split (n_args) [] stack in
-            let res = arrget (List.rev args) in
-            run' (state, res:: stack', input, output) code'
+              let (args, stack') = split (n_args) [] stack in
+              let res = arrget (List.rev args) in
+              run' (state, res:: stack', input, output) code'
           | S_STA (n_args) ->
-            let (args, stack') = split (n_args) [] stack in
-            let res = arrset (List.rev args) in
-            run' (state, res:: stack', input, output) code'
+              let (args, stack') = split (n_args) [] stack in
+              let res = arrset (List.rev args) in
+              run' (state, res:: stack', input, output) code'
     in
     run' (state, stack, input, output) code
-    
- let run_unit input (defs, main_body) =
+  
+  let run_unit input (defs, main_body) =
     map_labels main_body;
-    List.iter (fun (_, (_, body)) -> 
-      map_labels body) defs;
+    List.iter (fun (_, (_, body)) ->
+            map_labels body) defs;
     List.map (fun (name, (args, body)) -> add_call_ctx name args body) defs;
     run ([], [], input, []) main_body
   ;;
@@ -176,8 +163,6 @@ struct
   let rec stmt = function
     | Skip -> []
     | Assign (x, e) -> expr e @ [S_ST x]
-    | Read x -> [S_READ; S_ST x]
-    | Write e -> expr e @ [S_WRITE]
     | Seq (l, r) -> stmt l @ stmt r
     | If (e, s1, s2) ->
         let label_start_second = label_generate() in

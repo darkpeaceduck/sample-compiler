@@ -27,8 +27,6 @@ module Expr =
     | Var of string
     | Binop of string * t * t
     | Call of string * t list
-(* because of expr like "a:=[f(0), f(1)]" and b:=f()[] supports - array    *)
-(* boxing checks only with interpretation                                  *)
     | ArrayDef of bool * t list
     | ArrayImp of t * t list
 
@@ -89,8 +87,6 @@ module Stmt =
     type t =
     | Skip
     | Assign of string * Expr.t
-    | Read of string
-    | Write of Expr.t
     | Seq of t * t
     | If of Expr.t * t * t
     | While of Expr.t * t
@@ -105,9 +101,6 @@ module Stmt =
         x: IDENT s: (":=" e: expr { Assign (x, e) } | 
                    "(" args:!(Util.list0 expr) ")" { Call (x, args) }
                   ) { s }
-      (*| %"read"  "(" x:IDENT ")" {Read x}
-      | %"write" "(" e: expr ")" { Write e }
-      *)
       | %"skip" { Skip }
       | %"return" e: expr { Return e } 
       | %"if" e: expr 
@@ -130,8 +123,6 @@ module Stmt =
         
       | ar :!(Expr.array_imp_arg) args: (-"[" !(Expr.parse) -"]") + ":=" e:!(Expr.parse)
        { ArrayAssign (ar, args, e) }
-    (* | ar:!(Expr.parse) args:(-"[" !(Expr.parse) -"]")+ { ArrayImp (ar,  *)
-		(* args) }                                                             *)
     )
 
   end
