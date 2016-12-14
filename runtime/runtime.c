@@ -100,6 +100,16 @@ array * BT(arrcreate_unboxed)(int n_args, ...) {
 
 array * BT(arrmake)(int n, void * v) {
 	array * ar = arralloc(n);
+	ar->boxed = 0;
+	ar->n_args = n;
+	for(int i = 0; i < n; i++) {
+		ar->contents[i] = v;
+	}
+	return ar;
+}
+
+array * BT(Arrmake)(int n, void * v) {
+	array * ar = arralloc(n);
 	ar->boxed = 1;
 	ar->n_args = n;
 	for(int i = 0; i < n; i++) {

@@ -59,7 +59,15 @@ struct
   let write (inp, out) = function
     | x::[] ->
         ((inp, out @ [x]), Int 0)
+        
+  let arrmake co = function
+    | (Int n) :: (Int v) :: [] -> (co, Array (Array.make n (Int v)))
+
+  let arrmake_boxed co = function
+    | (Int n) :: t :: [] -> (co, Array (Array.make n t))
   
+  let arrlen co = function
+    | (Array a) :: [] -> (co, Int (Array.length a))
   let invoke name c args =
     match name with
     | "strset" -> strset c args
@@ -72,6 +80,9 @@ struct
     | "strsub" -> strsub c args
     | "read" -> read c args
     | "write" -> write c args
+    | "arrmake" -> arrmake c args
+    | "Arrmake" -> arrmake_boxed c args
+    | "arrlen"  -> arrlen c args
     | _ -> failwith "Builtin not found"
 end
 
@@ -108,7 +119,7 @@ struct
   let rec eval_list eval (state, input, output) call_f list =
     List.fold_left (fun (res, input, output) arg ->
             let (input', output', rc) = eval (state, input, output) call_f arg in
-            ([rc] @ res, input', output')) ([], input, output) list
+            (res @ [rc], input', output')) ([], input, output) list
   
   let rec eval ((state, input, output) as c) call_f = function
     | Const n -> (input, output, of_value(n))
