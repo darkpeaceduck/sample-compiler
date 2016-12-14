@@ -196,8 +196,7 @@ struct
         [replac] @ retrive_builtins defs xs
   ;;
   
-  let rec def = function
-    | (name, (args, body)) -> (name, (args, stmt body))
+  let rec def (name, (args, body)) = (name, (args, stmt body))
   
   let rec unit (defs, main_body) =
     let defs_compile = List.fold_left (fun res d -> [def d] @ res) [] defs in

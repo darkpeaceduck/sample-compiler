@@ -27,6 +27,8 @@ let edx = R 3
 let esi = R 4
 let edi = R 5
 
+let unreserved_regs = [| esi; edi |]
+
 let al = R8 0
 let ah = R8 1
 let bl = R8 2
@@ -82,7 +84,10 @@ object(self)
   
   method allocate_local =
     allocated_local := 1 + !allocated_local;
-    S !allocated_local
+    if !allocated_local < Array.length unreserved_regs then
+      Array.get unreserved_regs !allocated_local
+    else
+      S !allocated_local
   
   method create_local x =
     let result = self#allocate_local in
@@ -92,7 +97,7 @@ object(self)
   method allocated_local = !allocated_local
   method release_locals =
     local_vars := MAP.empty;
-    allocated_local := 0
+    allocated_local := -1
   
   val global_vars = ref SET.empty
   method allocate_global x =
@@ -225,7 +230,7 @@ struct
                 res
             | S_LD x ->
                 let sn = match (env#get_opnd x) with
-                  | Some (sn) -> sn
+                  | Some sn -> sn
                   | None -> failwith (Printf.sprintf "local varible %s doen's exists" x)
                 in
                 (sn:: stack, [])
@@ -330,8 +335,12 @@ let compile_function env name args body =
   env#set_scope FUN;
   List.iteri (fun num_arg arg -> let numb = num_arg + 1 in env#assign_local arg (Farg numb)) args;
   let fun_code = Compile.stack_program env name body in
-  [AsmLabel (env#func_name name)] @ [Special (Prologue env#allocated_local)] @ fun_code @ [X86Xor (eax, eax)] @
-  [AsmLabel (env#epilogue_label name)] @ [Special Epilogue] @ [X86Ret]
+  let (push_unreserved_regs, pop_unreserved_regs) =
+    List.split(List.map (fun arg -> (X86Push arg, X86Pop arg)) (Array.to_list unreserved_regs))
+  in
+  [AsmLabel (env#func_name name)] @ [Special (Prologue env#allocated_local)] @ push_unreserved_regs @
+  fun_code @ [X86Xor (eax, eax)] @
+  [AsmLabel (env#epilogue_label name)] @ (List.rev pop_unreserved_regs) @ [Special Epilogue] @ [X86Ret]
 
 let compile_main env body =
   env#get_new_frame;
